@@ -21,7 +21,7 @@ typedef enum {tlb_only, cache_only, tlb_cache} hierarchy_t;
 typedef enum {instruction, data} access_t;
 const char* get_hierarchy_type(uint32_t t) {
     switch(t) {
-        case tlb_only: return "tlb_only";
+        case tlb_only: return "tlb-only";
         case cache_only: return "cache-only";
         case tlb_cache: return "tlb+cache";
         default: assert(0); return "";
@@ -152,12 +152,21 @@ void print_statistics(uint32_t num_virtual_pages, uint32_t num_tlb_tag_bits, uin
  */
 
 void init_consts() {
+    uint32_t g_num_index_bits = 0;
     g_total_num_virtual_pages = 0;
     g_num_tlb_tag_bits = 0;
     g_tlb_offset_bits = 0;
-    g_num_cache_tag_bits = 0;
     g_cache_offset_bits = log(cache_block_size) / log(2);
-    printf("%d\n", g_cache_offset_bits);
+    g_num_cache_tag_bits = 32 - ((log(number_of_cache_blocks) / log(2)) + g_cache_offset_bits);
+}
+
+void do_cache(mem_access_t access) {
+    // if (access.accesstype)
+    if (1) { // if hit
+        g_result.cache_data_hits += 1;
+    } else {
+        g_result.cache_data_misses += 1;
+    }
 }
 
 
@@ -233,12 +242,9 @@ int main(int argc, char** argv) {
     printf("input:cache_block_size: %u\n", cache_block_size);
     printf("\n");
 
-    // initialize constants
-    init_consts();
-
     /* Open the file mem_trace.txt to read memory accesses */
     FILE *ptr_file;
-    ptr_file =fopen(file,"r");
+    ptr_file = fopen(file,"r");
     if (!ptr_file) {
         printf("Unable to open the trace file: %s\n", file);
         exit(-1);
@@ -252,6 +258,9 @@ int main(int argc, char** argv) {
 
     /* You may want to setup your TLB and/or Cache structure here. */
 
+    // initialize constants
+    init_consts();
+
     mem_access_t access;
     /* Loop until the whole trace file has been read. */
     while(1) {
@@ -261,7 +270,10 @@ int main(int argc, char** argv) {
             break;
         /* Add your code here */
         /* Feed the address to your TLB and/or Cache simulator and collect statistics. */
-
+        const char* h = get_hierarchy_type(hierarchy_type);
+        if (strcmp(h, "cache-only") == 0 || strcmp(h, "tlb+cache") == 0) {
+            do_cache(access);
+        }
     }
 
     /* Do not modify code below. */
