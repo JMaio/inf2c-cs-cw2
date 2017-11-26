@@ -152,16 +152,19 @@ void print_statistics(uint32_t num_virtual_pages, uint32_t num_tlb_tag_bits, uin
  *
  */
 
-int init_consts() {
+void init_consts() {
     g_total_num_virtual_pages = 0;
     g_num_tlb_tag_bits = 0;
     g_tlb_offset_bits = 0;
     g_cache_offset_bits = log(cache_block_size) / log(2);
     g_cache_index_bits = log(number_of_cache_blocks) / log(2);
-    // printf("CacheIndexBits:%u\n", g_cache_index_bits);
     g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
-    uint32_t *cache = malloc(number_of_cache_blocks * (cache_block_size * 8));
-    // allocate as follows:        cache lines      *   cache blocks    * 8 bits
+}
+
+void init_cache() {
+
+    // uint32_t *cache = malloc(number_of_cache_blocks * (cache_block_size * 8));
+    // // allocate as follows:        cache lines      *   cache blocks    * 8 bits
     // printf("size of cache: %u\n", number_of_cache_blocks * cache_block_size * 8);
 
     // // code for checking whether malloc succeeded
@@ -176,28 +179,50 @@ int init_consts() {
 
 uint32_t maskTag(uint32_t address) {
     // shift 32 - tag_bits to right to keep only tag bits
-    uint32_t c = g_num_cache_tag_bits;
-    return (address >> (32 - c));
+    uint32_t t = g_num_cache_tag_bits;
+    return (address >> (32 - t));
 }
 
 uint32_t maskIndex(uint32_t address) {
     // keep only middle index bits
-    uint32_t c = g_num_cache_tag_bits;
+    uint32_t t = g_num_cache_tag_bits;
     uint32_t o = g_cache_offset_bits;
 
-    return ((address << c) >> (c + o));
+    return ((address << t) >> (t + o));
 }
 uint32_t maskOffset(uint32_t address) {
     // keep only offset
-    uint32_t c = g_num_cache_tag_bits;
+    uint32_t t = g_num_cache_tag_bits;
     uint32_t i = g_cache_index_bits;
-    return ((address << (c + i)) >> (c + i));
+    return ((address << (t + i)) >> (t + i));
 }
 
+void setCache(mem_access_t access) {
+
+}
+
+int breaker = 0;
+
+void queryCache(mem_access_t access, uint32_t* cache) {
+    uint32_t t = maskTag(access.address);
+    uint32_t i = maskIndex(access.address);
+    uint32_t o = maskOffset(access.address);
+
+    uint32_t* queryTag = (cache + i);
+    if (breaker == 0) {
+        breaker++;
+    }
+    if (breaker == 1) {
+        printf("%u\n", i);
+        printf("%u\n", (uint32_t) queryTag);
+        breaker++;
+    }
 
 
-void do_cache(mem_access_t access) {
-    // if (access.accesstype)
+
+
+    if (access.accesstype == instruction)
+
     if (1) { // if hit
         g_result.cache_data_hits += 1;
     } else {
@@ -205,14 +230,19 @@ void do_cache(mem_access_t access) {
     }
 }
 
+void queryTLB(mem_access_t access) {
+
+}
+
 int debug = 1;
-void do_debug() {
+void do_debug(uint32_t* cache) {
     printf("debug enabled!\n");
     printf("indexBits: %u\n", g_cache_index_bits);
     uint32_t a = 1579683636;
     printf("%u\n", maskTag(a));
     printf("%u\n", maskIndex(a));
     printf("%u\n", maskOffset(a));
+    printf("%p\n", cache);
     printf("\n");
 }
 
@@ -307,8 +337,14 @@ int main(int argc, char** argv) {
     // initialize constants
     init_consts();
 
+    // make visible to all in main
+    uint32_t *cache = malloc(number_of_cache_blocks * (cache_block_size * 8));
+    // allocate as follows:        cache lines      *   cache blocks    * 8 bits
+
+
+
     if (debug) {
-        do_debug();
+        do_debug(cache);
     }
 
     mem_access_t access;
@@ -321,8 +357,13 @@ int main(int argc, char** argv) {
         /* Add your code here */
         /* Feed the address to your TLB and/or Cache simulator and collect statistics. */
         const char* h = get_hierarchy_type(hierarchy_type);
-        if (strcmp(h, "cache-only") == 0 || strcmp(h, "tlb+cache") == 0) {
-            do_cache(access);
+        if (strcmp(h, "cache-only") == 0) {
+            queryCache(access, cache);
+        } else if (strcmp(h, "tlb-only") == 0) {
+            queryTLB(access);
+        } else if (strcmp(h, "tlb-cache") == 0) {
+            queryTLB(access);
+            queryCache(access, cache);
         }
     }
 
