@@ -10,13 +10,13 @@ inp = ""
 
 while True:
     b = rand_bin32()
-    print b, int(b, 2)
+    print(b, int(b, 2))
     t = b[:15]
     i = b[15:15+11]
     o = b[15+11:32]
-    print t + " " + i + " " + o
-    print (int(t, 2), int(i, 2), int(o, 2))
-    inp = raw_input()
+    print(t + " " + i + " " + o)
+    print((int(t, 2), int(i, 2), int(o, 2)))
+    inp = input()
 
 
         
