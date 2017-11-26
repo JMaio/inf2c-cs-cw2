@@ -156,8 +156,8 @@ void init_consts() {
     g_total_num_virtual_pages = 0;
     g_num_tlb_tag_bits = 0;
     g_tlb_offset_bits = 0;
-    g_cache_offset_bits = log(cache_block_size) / log(2);
-    g_num_cache_tag_bits = 32 - ((log(number_of_cache_blocks) / log(2)) + g_cache_offset_bits);
+    g_cache_offset_bits = (log(cache_block_size) / log(2)) - 1;
+    g_num_cache_tag_bits = 32 - ((log(number_of_cache_blocks) / log(2) - 1) + g_cache_offset_bits);
 }
 
 void do_cache(mem_access_t access) {
