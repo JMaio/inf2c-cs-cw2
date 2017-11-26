@@ -66,6 +66,7 @@ uint32_t g_num_tlb_tag_bits = 0;
 uint32_t g_tlb_offset_bits = 0;
 uint32_t g_num_cache_tag_bits = 0;
 uint32_t g_cache_offset_bits = 0;
+uint32_t g_cache_index_bits = 0; // added for convenience
 result_t g_result;
 
 /* Reads a memory access from the trace file and returns
@@ -151,14 +152,49 @@ void print_statistics(uint32_t num_virtual_pages, uint32_t num_tlb_tag_bits, uin
  *
  */
 
-void init_consts() {
-    uint32_t g_num_index_bits = 0;
+int init_consts() {
     g_total_num_virtual_pages = 0;
     g_num_tlb_tag_bits = 0;
     g_tlb_offset_bits = 0;
-    g_cache_offset_bits = (log(cache_block_size) / log(2)) - 1;
-    g_num_cache_tag_bits = 32 - ((log(number_of_cache_blocks) / log(2) - 1) + g_cache_offset_bits);
+    g_cache_offset_bits = log(cache_block_size) / log(2);
+    g_cache_index_bits = log(number_of_cache_blocks) / log(2);
+    // printf("CacheIndexBits:%u\n", g_cache_index_bits);
+    g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
+    uint32_t *cache = malloc(number_of_cache_blocks * (cache_block_size * 8));
+    // allocate as follows:        cache lines      *   cache blocks    * 8 bits
+    // printf("size of cache: %u\n", number_of_cache_blocks * cache_block_size * 8);
+
+    // // code for checking whether malloc succeeded
+    // // wikipedia: https://en.wikipedia.org/wiki/C_dynamic_memory_allocation
+    // if (cache == NULL) {
+    //   fprintf(stderr, "malloc failed\n");
+    //   return (-1);
+    // } else {
+    //       return 1;
+    // }
 }
+
+uint32_t maskTag(uint32_t address) {
+    // shift 32 - tag_bits to right to keep only tag bits
+    uint32_t c = g_num_cache_tag_bits;
+    return (address >> (32 - c));
+}
+
+uint32_t maskIndex(uint32_t address) {
+    // keep only middle index bits
+    uint32_t c = g_num_cache_tag_bits;
+    uint32_t o = g_cache_offset_bits;
+
+    return ((address << c) >> (c + o));
+}
+uint32_t maskOffset(uint32_t address) {
+    // keep only offset
+    uint32_t c = g_num_cache_tag_bits;
+    uint32_t i = g_cache_index_bits;
+    return ((address << (c + i)) >> (c + i));
+}
+
+
 
 void do_cache(mem_access_t access) {
     // if (access.accesstype)
@@ -169,6 +205,16 @@ void do_cache(mem_access_t access) {
     }
 }
 
+int debug = 1;
+void do_debug() {
+    printf("debug enabled!\n");
+    printf("indexBits: %u\n", g_cache_index_bits);
+    uint32_t a = 1579683636;
+    printf("%u\n", maskTag(a));
+    printf("%u\n", maskIndex(a));
+    printf("%u\n", maskOffset(a));
+    printf("\n");
+}
 
 int main(int argc, char** argv) {
 
@@ -260,6 +306,10 @@ int main(int argc, char** argv) {
 
     // initialize constants
     init_consts();
+
+    if (debug) {
+        do_debug();
+    }
 
     mem_access_t access;
     /* Loop until the whole trace file has been read. */
