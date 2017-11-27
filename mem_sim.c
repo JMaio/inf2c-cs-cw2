@@ -46,7 +46,6 @@ typedef struct {
     uint32_t cache_instruction_misses;
 } result_t;
 
-
 /*
  * Parameters for TLB and cache that will be populated by the provided code skeleton.
  */
@@ -161,28 +160,20 @@ void init_consts() {
     g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
 }
 
-void init_cache() {
+// define what a cache line should look like
+typedef struct {
+    uint8_t valid;
+    uint32_t tag;
+} cache_block_t;
 
-    // uint32_t *cache = malloc(number_of_cache_blocks * (cache_block_size * 8));
-    // // allocate as follows:        cache lines      *   cache blocks    * 8 bits
-    // printf("size of cache: %u\n", number_of_cache_blocks * cache_block_size * 8);
-
-    // // code for checking whether malloc succeeded
-    // // wikipedia: https://en.wikipedia.org/wiki/C_dynamic_memory_allocation
-    // if (cache == NULL) {
-    //   fprintf(stderr, "malloc failed\n");
-    //   return (-1);
-    // } else {
-    //       return 1;
-    // }
-}
-
+// get tag from address
 uint32_t maskTag(uint32_t address) {
     // shift 32 - tag_bits to right to keep only tag bits
     uint32_t t = g_num_cache_tag_bits;
     return (address >> (32 - t));
 }
 
+// get index from address
 uint32_t maskIndex(uint32_t address) {
     // keep only middle index bits
     uint32_t t = g_num_cache_tag_bits;
@@ -190,6 +181,8 @@ uint32_t maskIndex(uint32_t address) {
 
     return ((address << t) >> (t + o));
 }
+
+// get offset from address
 uint32_t maskOffset(uint32_t address) {
     // keep only offset
     uint32_t t = g_num_cache_tag_bits;
@@ -197,52 +190,70 @@ uint32_t maskOffset(uint32_t address) {
     return ((address << (t + i)) >> (t + i));
 }
 
-void setCache(mem_access_t access) {
+uint8_t simCache(uint32_t address, cache_block_t* cache) {
+    uint32_t t = maskTag(address);
+    uint32_t i = maskIndex(address);
 
-}
+    cache_block_t block = *(cache + i);
+    // printf("block valid : %i\n", block.valid);
+    // printf("cache address : %lu\n", cache);
+    // printf("cache index : %lu\n", cache + i);
+    // printf("first entry valid : %i\n", cache->valid);
+    // printf("first entry tag : %i\n", cache->tag);
+    // printf("this entry tag : %i\n", (cache + i)->tag);
 
-int breaker = 0;
+    uint8_t hit = 0;
 
-void queryCache(mem_access_t access, uint32_t* cache) {
-    uint32_t t = maskTag(access.address);
-    uint32_t i = maskIndex(access.address);
-    uint32_t o = maskOffset(access.address);
-
-    uint32_t* queryTag = (cache + i);
-    if (breaker == 0) {
-        breaker++;
-    }
-    if (breaker == 1) {
-        printf("%u\n", i);
-        printf("%u\n", (uint32_t) queryTag);
-        breaker++;
-    }
-
-
-
-
-    if (access.accesstype == instruction)
-
-    if (1) { // if hit
-        g_result.cache_data_hits += 1;
+    if (block.valid == 1) {
+        if (block.tag == t) {
+            hit = 1;
+        } else {
+            (cache + i)->tag = t;
+        }
     } else {
-        g_result.cache_data_misses += 1;
+        // set block to valid, block tag to address tag
+        (cache + i)->valid = 1;
+        (cache + i)->tag = t;
+    }
+
+    return hit;
+
+}
+
+void simTLB(uint32_t address) {
+
+}
+
+void doCacheStats(uint8_t cacheHit, access_t at) {
+    if (cacheHit) {
+        if (at == instruction) {
+            g_result.cache_instruction_hits++;
+        } else if (at == data) {
+            g_result.cache_data_hits++;
+        }
+    } else {
+        if (at == instruction) {
+            g_result.cache_instruction_misses++;
+        } else if (at == data) {
+            g_result.cache_data_misses++;
+        }
     }
 }
 
-void queryTLB(mem_access_t access) {
+int debug = 0;
 
-}
-
-int debug = 1;
-void do_debug(uint32_t* cache) {
+void do_debug(cache_block_t* cache) {
     printf("debug enabled!\n");
     printf("indexBits: %u\n", g_cache_index_bits);
     uint32_t a = 1579683636;
-    printf("%u\n", maskTag(a));
-    printf("%u\n", maskIndex(a));
-    printf("%u\n", maskOffset(a));
-    printf("%p\n", cache);
+    printf("maskTag : %u\n", maskTag(a));
+    printf("maskIndex : %u\n", maskIndex(a));
+    printf("maskOffset : %u\n", maskOffset(a));
+    printf("cache pointer : %p\n", cache);
+    printf("size of uint32_t : %lu\n", sizeof(uint32_t));
+    printf("size of uint8_t : %lu\n", sizeof(uint8_t));
+    printf("size of cache line : %lu\n", sizeof(cache_block_t));
+    printf("size of cache : %lu\n", number_of_cache_blocks * sizeof(cache_block_t));
     printf("\n");
 }
 
@@ -338,10 +349,8 @@ int main(int argc, char** argv) {
     init_consts();
 
     // make visible to all in main
-    uint32_t *cache = malloc(number_of_cache_blocks * (cache_block_size * 8));
-    // allocate as follows:        cache lines      *   cache blocks    * 8 bits
 
-
+    cache_block_t* cache = malloc(number_of_cache_blocks * sizeof(cache_block_t));
 
     if (debug) {
         do_debug(cache);
@@ -356,14 +365,31 @@ int main(int argc, char** argv) {
             break;
         /* Add your code here */
         /* Feed the address to your TLB and/or Cache simulator and collect statistics. */
+        uint32_t address = dummy_translate_virtual_page_num(access.address >> g_cache_offset_bits);
+        // uint32_t address = access.address;
+        uint32_t at = access.accesstype;
+
         const char* h = get_hierarchy_type(hierarchy_type);
         if (strcmp(h, "cache-only") == 0) {
-            queryCache(access, cache);
+            uint8_t cacheHit = simCache(address, cache);
+            doCacheStats(cacheHit, at);
         } else if (strcmp(h, "tlb-only") == 0) {
-            queryTLB(access);
+            simTLB(address);
         } else if (strcmp(h, "tlb-cache") == 0) {
-            queryTLB(access);
-            queryCache(access, cache);
+            simTLB(address);
+            if (simCache(address, cache)) {
+                if (at == instruction) {
+                    g_result.cache_instruction_hits++;
+                } else if (at == data) {
+                    g_result.cache_data_hits++;
+                }
+            } else {
+                if (at == instruction) {
+                    g_result.cache_instruction_misses++;
+                } else if (at == data) {
+                    g_result.cache_data_misses++;
+                }
+            }
         }
     }
 
@@ -373,5 +399,7 @@ int main(int argc, char** argv) {
 
     /* Close the trace file. */
     fclose(ptr_file);
+
+    free(cache);
     return 0;
 }
