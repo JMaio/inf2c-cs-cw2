@@ -378,7 +378,7 @@ int main(int argc, char** argv) {
         /* Feed the address to your TLB and/or Cache simulator and collect statistics. */
         uint32_t at = access.accesstype;
         uint32_t v_add = access.address;
-
+        // mask as a one-off
         uint32_t page_o = v_add & (page_size - 1);
         // printf("%u\n", g_page_offset_bits);
         uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_page_offset_bits);
