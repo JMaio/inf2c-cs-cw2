@@ -66,6 +66,7 @@ uint32_t g_tlb_offset_bits = 0;
 uint32_t g_num_cache_tag_bits = 0;
 uint32_t g_cache_offset_bits = 0;
 uint32_t g_cache_index_bits = 0; // added for convenience
+uint32_t g_page_offset_bits = 0;
 result_t g_result;
 
 /* Reads a memory access from the trace file and returns
@@ -155,9 +156,19 @@ void init_consts() {
     g_total_num_virtual_pages = 0;
     g_num_tlb_tag_bits = 0;
     g_tlb_offset_bits = 0;
+    g_page_offset_bits = ceil(log2(page_size));
     g_cache_offset_bits = log(cache_block_size) / log(2);
     g_cache_index_bits = log(number_of_cache_blocks) / log(2);
     g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
+
+
+    // g_total_num_virtual_pages = 0;
+    // g_num_tlb_tag_bits = 0;
+    // g_tlb_offset_bits = 0;
+    // g_num_cache_tag_bits = 0;
+    // g_cache_offset_bits = 0;
+    // g_cache_index_bits = 0; // added for convenience
+    // g_result;
 }
 
 // define what a cache line should look like
@@ -365,31 +376,22 @@ int main(int argc, char** argv) {
             break;
         /* Add your code here */
         /* Feed the address to your TLB and/or Cache simulator and collect statistics. */
-        uint32_t address = dummy_translate_virtual_page_num(access.address >> g_cache_offset_bits);
-        // uint32_t address = access.address;
         uint32_t at = access.accesstype;
+        uint32_t v_add = access.address;
+
+        uint32_t page_o = maskOffset(v_add);
+        // printf("%u\n", g_page_offset_bits);
+        uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_page_offset_bits);
+        uint32_t phys_address = (phys_page_num << g_page_offset_bits) | page_o;
 
         const char* h = get_hierarchy_type(hierarchy_type);
         if (strcmp(h, "cache-only") == 0) {
-            uint8_t cacheHit = simCache(address, cache);
+            uint8_t cacheHit = simCache(phys_address, cache);
             doCacheStats(cacheHit, at);
         } else if (strcmp(h, "tlb-only") == 0) {
-            simTLB(address);
+            simTLB(phys_address);
         } else if (strcmp(h, "tlb-cache") == 0) {
-            simTLB(address);
-            if (simCache(address, cache)) {
-                if (at == instruction) {
-                    g_result.cache_instruction_hits++;
-                } else if (at == data) {
-                    g_result.cache_data_hits++;
-                }
-            } else {
-                if (at == instruction) {
-                    g_result.cache_instruction_misses++;
-                } else if (at == data) {
-                    g_result.cache_data_misses++;
-                }
-            }
+            simTLB(phys_address);
         }
     }
 
