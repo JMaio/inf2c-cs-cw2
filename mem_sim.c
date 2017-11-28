@@ -171,6 +171,14 @@ void init_consts() {
     // g_result;
 }
 
+// define what a TLB line should contain
+typedef struct {
+    uint8_t valid;
+    uint8_t dirty;
+    uint32_t tag;
+    uint32_t phys_page_num;
+} tlb_block_t;
+
 // define what a cache line should look like
 typedef struct {
     uint8_t valid;
