@@ -156,7 +156,7 @@ void init_consts() {
     g_total_num_virtual_pages = 0;
     g_num_tlb_tag_bits = 0;
     g_tlb_offset_bits = 0;
-    g_page_offset_bits = ceil(log2(page_size));
+    g_page_offset_bits = log(page_size) / log(2);
     g_cache_offset_bits = log(cache_block_size) / log(2);
     g_cache_index_bits = log(number_of_cache_blocks) / log(2);
     g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
@@ -178,14 +178,14 @@ typedef struct {
 } cache_block_t;
 
 // get tag from address
-uint32_t maskTag(uint32_t address) {
+uint32_t maskCacheTag(uint32_t address) {
     // shift 32 - tag_bits to right to keep only tag bits
     uint32_t t = g_num_cache_tag_bits;
     return (address >> (32 - t));
 }
 
 // get index from address
-uint32_t maskIndex(uint32_t address) {
+uint32_t maskCacheIndex(uint32_t address) {
     // keep only middle index bits
     uint32_t t = g_num_cache_tag_bits;
     uint32_t o = g_cache_offset_bits;
@@ -194,7 +194,7 @@ uint32_t maskIndex(uint32_t address) {
 }
 
 // get offset from address
-uint32_t maskOffset(uint32_t address) {
+uint32_t maskCacheOffset(uint32_t address) {
     // keep only offset
     uint32_t t = g_num_cache_tag_bits;
     uint32_t i = g_cache_index_bits;
@@ -202,8 +202,8 @@ uint32_t maskOffset(uint32_t address) {
 }
 
 uint8_t simCache(uint32_t address, cache_block_t* cache) {
-    uint32_t t = maskTag(address);
-    uint32_t i = maskIndex(address);
+    uint32_t t = maskCacheTag(address);
+    uint32_t i = maskCacheIndex(address);
 
     cache_block_t block = *(cache + i);
     // printf("block valid : %i\n", block.valid);
@@ -257,9 +257,9 @@ void do_debug(cache_block_t* cache) {
     printf("debug enabled!\n");
     printf("indexBits: %u\n", g_cache_index_bits);
     uint32_t a = 1579683636;
-    printf("maskTag : %u\n", maskTag(a));
-    printf("maskIndex : %u\n", maskIndex(a));
-    printf("maskOffset : %u\n", maskOffset(a));
+    printf("maskCacheTag : %u\n", maskCacheTag(a));
+    printf("maskCacheIndex : %u\n", maskCacheIndex(a));
+    printf("maskCacheOffset : %u\n", maskCacheOffset(a));
     printf("cache pointer : %p\n", cache);
     printf("size of uint32_t : %lu\n", sizeof(uint32_t));
     printf("size of uint8_t : %lu\n", sizeof(uint8_t));
@@ -379,7 +379,7 @@ int main(int argc, char** argv) {
         uint32_t at = access.accesstype;
         uint32_t v_add = access.address;
 
-        uint32_t page_o = maskOffset(v_add);
+        uint32_t page_o = v_add & (page_size - 1);
         // printf("%u\n", g_page_offset_bits);
         uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_page_offset_bits);
         uint32_t phys_address = (phys_page_num << g_page_offset_bits) | page_o;
