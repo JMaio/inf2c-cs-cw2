@@ -213,7 +213,7 @@ uint8_t simCache(uint32_t address, cache_block_t* cache) {
     uint32_t t = maskCacheTag(address);
     uint32_t i = maskCacheIndex(address);
 
-    cache_block_t block = *(cache + i);
+    cache_block_t *block = cache + i;
     // printf("block valid : %i\n", block.valid);
     // printf("cache address : %lu\n", cache);
     // printf("cache index : %lu\n", cache + i);
@@ -223,16 +223,16 @@ uint8_t simCache(uint32_t address, cache_block_t* cache) {
 
     uint8_t hit = 0;
 
-    if (block.valid == 1) {
-        if (block.tag == t) {
+    if (block->valid == 1) {
+        if (block->tag == t) {
             hit = 1;
         } else {
-            (cache + i)->tag = t;
+            block->tag = t;
         }
     } else {
         // set block to valid, block tag to address tag
-        (cache + i)->valid = 1;
-        (cache + i)->tag = t;
+        block->valid = 1;
+        block->tag = t;
     }
 
     return hit;
