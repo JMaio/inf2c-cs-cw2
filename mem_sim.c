@@ -244,6 +244,22 @@ void doCacheStats(uint8_t cacheHit, access_t at) {
     }
 }
 
+void doTlbStats(uint8_t tlbHit, access_t at) {
+    if (tlbHit) {
+        if (at == instruction) {
+            g_result.tlb_instruction_hits++;
+        } else if (at == data) {
+            g_result.tlb_data_hits++;
+        }
+    } else {
+        if (at == instruction) {
+            g_result.tlb_instruction_misses++;
+        } else if (at == data) {
+            g_result.tlb_data_misses++;
+        }
+    }
+}
+
 int debug = 0;
 
 void do_debug(cache_block_t* cache) {
