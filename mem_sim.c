@@ -242,10 +242,25 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
             block->tag = tag;
             break;
         }
+        // add at end: only runs if memory is full
+        if (block->lru_bits == 0) {
+            lruIndex = i;
+        }
     }
-
-
-
+    // iterate over tlb to remove 1 from every LRU, preventing growth
+    // set 0 to max (number_of_tlb_entries) and replace with new tag
+    if (!hit) {
+        tlb_block_t *block = tlb + lruIndex;
+        block->tag = tag;
+        block->lru_bits = number_of_tlb_entries;
+        block->phys_page_num = dummy_translate_virtual_page_num(address >> g_tlb_offset_bits);
+        return(-1);
+    }
+    for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
+        tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
+        block->lru_bits--;
+    }
+    return phys_page_num;
 }
 
 void doCacheStats(uint8_t cacheHit, access_t at) {
