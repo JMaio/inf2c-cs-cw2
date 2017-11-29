@@ -201,30 +201,50 @@ uint32_t maskCacheOffset(uint32_t address) {
 }
 
 uint8_t simCache(uint32_t address, cache_block_t* cache) {
-    uint32_t t = maskCacheTag(address);
+    uint32_t tag = maskCacheTag(address);
     uint32_t i = maskCacheIndex(address);
 
     cache_block_t *block = cache + i;
-
     uint8_t hit = 0;
 
     if (block->valid_bit == 1) {
-        if (block->tag == t) {
+        if (block->tag == tag) {
             hit = 1;
         } else {
-            block->tag = t;
+            block->tag = tag;
         }
     } else {
         // set block to valid, block tag to address tag
         block->valid_bit = 1;
-        block->tag = t;
+        block->tag = tag;
     }
-
     return hit;
-
 }
 
-void simTLB(uint32_t address) {
+// return integer to make sure it's hit: -1 = miss; > 0 = hit
+int simTlb(uint32_t address, tlb_block_t* tlb) {
+    uint32_t tag = address >> g_tlb_offset_bits;
+    uint8_t hit = 0;
+    int phys_page_num;
+    // iterate over tlb to find matching tag
+    for (int i = 0; i < number_of_tlb_entries; i++) {
+        if (hit) break;
+
+        tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
+
+        if (block->valid_bit == 1) {
+            if (block->tag == tag) {
+                phys_page_num = block->phys_page_num;
+                hit = 1;
+            }
+        } else {
+            block->valid_bit = 1;
+            block->tag = tag;
+            break;
+        }
+    }
+
+
 
 }
 
