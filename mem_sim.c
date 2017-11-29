@@ -222,48 +222,85 @@ uint8_t simCache(uint32_t address, cache_block_t* cache) {
     return hit;
 }
 
-// return integer to make sure it's hit: -1 = miss; > 0 = hit
+// return integer to make sure it's hit: -1 = miss; >= 0 = hit
 int simTlb(uint32_t address, tlb_block_t* tlb) {
     uint32_t tag = address >> g_tlb_offset_bits;
-    uint8_t hit = 0;
     uint8_t lruIndex;
-    uint32_t phys_page_num;
+    int phys_page_num = -1;
+    // phys_page_num < 0 means miss
+    tlb_block_t *block;
+    // thought process: all blocks start with lru_bits set to 0
+    //     -> on a hit,
     // iterate over tlb to find matching tag
-    for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
-        if (hit) break;
+    // (i < number_of_tlb_entries)
+    for (int i = 0; (i < number_of_tlb_entries) && (phys_page_num < 0); i++) {
 
-        tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
-
+        // block && (!hit)
+        // < (tlb + number_of_tlb_entries * sizeof(tlb_block_t)); block++) {
+        tlb_block_t *block = tlb + i;
+        // printf("tlb index : %i \n", i * sizeof(tlb_block_t));
+        // // else only runs while there are empty blocks (valid_bit == 0)
         if (block->valid_bit == 1) {
+            // if valid_bit == 1 and matching tag : retrieve physical_page_num
             if (block->tag == tag) {
                 phys_page_num = block->phys_page_num;
-                hit = 1;
+                // on hit, exits loop
             }
         } else {
+            // not valid block, set lru_bits to > 0
+            // set block to valid
             block->valid_bit = 1;
+            // only ever increments up to number_of_tlb_entries
+            block->lru_bits = ++g_tlb_lru_tracker;
+            // set tag
             block->tag = tag;
-            break;
-        }
-        // add at end: only runs if memory is full
-        if (block->lru_bits == 0) {
-            lruIndex = i;
+            // set physical address
+            block->phys_page_num = dummy_translate_virtual_page_num(tag);
+            printf("%u\n", block->phys_page_num);
         }
     }
     // iterate over tlb to remove 1 from every LRU, preventing growth
     // set 0 to max (number_of_tlb_entries) and replace with new tag
-    if (!hit) {
-        tlb_block_t *block = tlb + lruIndex;
-        block->tag = tag;
-        block->lru_bits = number_of_tlb_entries;
-        block->phys_page_num = dummy_translate_virtual_page_num(address >> g_tlb_offset_bits);
-        return(-1);
-    }
-    for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
-        tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
-        block->lru_bits--;
+
+    if (!phys_page_num < 0) {
+        if (g_tlb_lru_tracker == number_of_tlb_entries) {
+            for (int i = 0; i < number_of_tlb_entries; i++) {
+                tlb_block_t *block = tlb + i;
+                // printf("%u\n", block->lru_bits);
+                block->lru_bits--;
+                if (block->lru_bits == 0) lruIndex = i;
+            }
+            tlb_block_t *block = tlb + lruIndex;
+            block->lru_bits = number_of_tlb_entries;
+            block->tag = tag;
+            block->phys_page_num = dummy_translate_virtual_page_num(tag);
+        }
     }
     return phys_page_num;
 }
+
+// void testTlb(tlb_block_t* tlb) {
+//     for (int i = 0; i < number_of_tlb_entries; i++) {
+//         tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
+//         block->tag = i;
+//     }
+//     for (int i = 0; i < number_of_tlb_entries; i++) {
+//         tlb_block_t *block = tlb + i;
+//         printf("%u\n", block->tag);
+//     }
+//     for (int i = 0; i < number_of_tlb_entries; i++) {
+//         tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
+//         printf("%u\n", block->tag);
+//     }
+//     // for (int i = 0; i < number_of_tlb_entries; i++) {
+//     //     tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
+//     //     block->tag = i;
+//     // }
+//     // for (int i = 0; i < number_of_tlb_entries; i++) {
+//     //     tlb_block_t *block = tlb + i;
+//     //     block->tag = i;
+//     // }
+// }
 
 void doCacheStats(uint8_t cacheHit, access_t at) {
     if (cacheHit) {
