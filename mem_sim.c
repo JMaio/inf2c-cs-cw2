@@ -233,12 +233,11 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
     //     -> on a hit,
     // iterate over tlb to find matching tag
     // (i < number_of_tlb_entries)
-    for (int i = 0; (i < number_of_tlb_entries) && (phys_page_num < 0); i++) {
+    for (uint8_t i = 0; (i < number_of_tlb_entries) && (phys_page_num < 0); i++) {
 
         // block && (!hit)
         // < (tlb + number_of_tlb_entries * sizeof(tlb_block_t)); block++) {
         tlb_block_t *block = tlb + i;
-        // printf("tlb index : %i \n", i * sizeof(tlb_block_t));
         // // else only runs while there are empty blocks (valid_bit == 0)
         if (block->valid_bit == 1) {
             // if valid_bit == 1 and matching tag : retrieve physical_page_num
