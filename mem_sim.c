@@ -255,15 +255,18 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
             block->tag = tag;
             // set physical address
             block->phys_page_num = dummy_translate_virtual_page_num(tag);
-            printf("%u\n", block->phys_page_num);
+            // printf("%i\n", phys_page_num);
+            // printf("%u\n", block->phys_page_num);
         }
     }
+    // printf("%i\n", phys_page_num);
     // iterate over tlb to remove 1 from every LRU, preventing growth
     // set 0 to max (number_of_tlb_entries) and replace with new tag
 
-    if (!phys_page_num < 0) {
+    if (phys_page_num < 0) {
         if (g_tlb_lru_tracker == number_of_tlb_entries) {
-            for (int i = 0; i < number_of_tlb_entries; i++) {
+            // printf("not hit, tlb full\n");
+            for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
                 tlb_block_t *block = tlb + i;
                 // printf("%u\n", block->lru_bits);
                 block->lru_bits--;
