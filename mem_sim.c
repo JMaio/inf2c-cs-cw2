@@ -222,6 +222,37 @@ uint8_t simCache(uint32_t address, cache_block_t* cache) {
     return hit;
 }
 
+void updateTlbLru(uint8_t index, tlb_block_t* tlb) {
+// update tlb lru_bits based on most recent index
+// implementation note:
+//  -> LRU is implemented on a "cascading" basis: blocks start with lru_bits
+//      set to 0;
+//  ->  each block is assigned a number from 1 to n_tlb_entries on write;
+//  ->  once the tlb is full, the block with lru_bits == 0 is set to
+//      lru_bits = n_tlb_entries, and all blocks are decremented by 1, such that
+//      there will be a single block with lru_bits == 0 in the tlb
+//  ->  if a
+//
+// if tlb is full, use default behaviour
+    tlb_block_t *block_recent = tlb + index;
+    // define cutoff point for decrement
+    uint8_t cutoff = block_recent->lru_bits;
+    // replace lru -> decrement all blocks with lru > current to replace
+    //             -> set most recently used to current global
+    // set most recently used to current global
+    for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
+        tlb_block_t *block = tlb + i;
+        if (block->lru_bits > cutoff) {
+            block->lru_bits--;
+        }
+    }
+    if (g_tlb_lru_tracker == number_of_tlb_entries) {
+        block_recent->lru_bits = number_of_tlb_entries - 1;
+    } else {
+        block_recent->lru_bits = g_tlb_lru_tracker;
+    }
+}
+
 // return integer to make sure it's hit: -1 = miss; >= 0 = hit
 int simTlb(uint32_t address, tlb_block_t* tlb) {
     uint32_t tag = address >> g_tlb_offset_bits;
