@@ -152,8 +152,8 @@ void print_statistics(uint32_t num_virtual_pages, uint32_t num_tlb_tag_bits, uin
  */
 
 void init_consts() {
-    g_total_num_virtual_pages = pow(2, (32 - g_page_offset_bits));
     g_tlb_offset_bits = log(page_size) / log(2);;
+    g_total_num_virtual_pages = pow(2, (32 - g_tlb_offset_bits));
     g_num_tlb_tag_bits = (32 - g_tlb_offset_bits);
     g_cache_offset_bits = log(cache_block_size) / log(2);
     g_cache_index_bits = log(number_of_cache_blocks) / log(2);
