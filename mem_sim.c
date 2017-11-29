@@ -152,36 +152,27 @@ void print_statistics(uint32_t num_virtual_pages, uint32_t num_tlb_tag_bits, uin
  */
 
 void init_consts() {
-    g_page_offset_bits = log(page_size) / log(2);
     g_total_num_virtual_pages = pow(2, (32 - g_page_offset_bits));
-    printf("num vpages : %u\n", g_total_num_virtual_pages);
-    g_num_tlb_tag_bits = 0;
-    g_tlb_offset_bits = 0;
+    g_tlb_offset_bits = log(page_size) / log(2);;
+    g_num_tlb_tag_bits = (32 - g_tlb_offset_bits);
     g_cache_offset_bits = log(cache_block_size) / log(2);
     g_cache_index_bits = log(number_of_cache_blocks) / log(2);
     g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
 
-
-    // g_total_num_virtual_pages = 0;
-    // g_num_tlb_tag_bits = 0;
-    // g_tlb_offset_bits = 0;
-    // g_num_cache_tag_bits = 0;
-    // g_cache_offset_bits = 0;
-    // g_cache_index_bits = 0; // added for convenience
-    // g_result;
 }
 
 // define what a TLB line should contain
 typedef struct {
-    uint8_t valid;
-    uint8_t dirty;
+    uint8_t valid_bit;
+    uint8_t dirty_bit;
+    uint8_t lru_bits; // need at most 4 bits to map to TLB entries
     uint32_t tag;
     uint32_t phys_page_num;
 } tlb_block_t;
 
 // define what a cache line should look like
 typedef struct {
-    uint8_t valid;
+    uint8_t valid_bit;
     uint32_t tag;
 } cache_block_t;
 
