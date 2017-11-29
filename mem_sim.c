@@ -370,6 +370,8 @@ int main(int argc, char** argv) {
 
     // make visible to all in main
 
+    tlb_block_t* tlb = malloc(number_of_tlb_entries * sizeof(tlb_block_t));
+    
     cache_block_t* cache = malloc(number_of_cache_blocks * sizeof(cache_block_t));
 
     if (debug) {
