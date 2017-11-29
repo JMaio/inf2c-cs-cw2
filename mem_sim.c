@@ -66,7 +66,6 @@ uint32_t g_tlb_offset_bits = 0;
 uint32_t g_num_cache_tag_bits = 0;
 uint32_t g_cache_offset_bits = 0;
 uint32_t g_cache_index_bits = 0; // added for convenience
-uint32_t g_page_offset_bits = 0;
 result_t g_result;
 
 /* Reads a memory access from the trace file and returns
