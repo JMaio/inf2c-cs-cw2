@@ -388,19 +388,21 @@ int main(int argc, char** argv) {
         uint32_t at = access.accesstype;
         uint32_t v_add = access.address;
         // mask as a one-off
-        uint32_t page_o = v_add & (page_size - 1);
         // printf("%u\n", g_page_offset_bits);
-        uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_page_offset_bits);
-        uint32_t phys_address = (phys_page_num << g_page_offset_bits) | page_o;
+
 
         const char* h = get_hierarchy_type(hierarchy_type);
         if (strcmp(h, "cache-only") == 0) {
+            uint32_t page_o = v_add & (page_size - 1);
+            uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_page_offset_bits);
+            uint32_t phys_address = (phys_page_num << g_page_offset_bits) | page_o;
             uint8_t cacheHit = simCache(phys_address, cache);
             doCacheStats(cacheHit, at);
         } else if (strcmp(h, "tlb-only") == 0) {
-            simTLB(phys_address);
+            uint8_t tlbHit = simTlb(v_add);
+            doTlbStats()
         } else if (strcmp(h, "tlb-cache") == 0) {
-            simTLB(phys_address);
+            simTlb(v_add);
         }
     }
 
