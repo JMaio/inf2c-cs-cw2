@@ -435,11 +435,13 @@ int main(int argc, char** argv) {
             uint32_t phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
             uint8_t cacheHit = simCache(phys_address, cache);
             doCacheStats(cacheHit, at);
-        } else if (strcmp(h, "tlb-only") == 0) {
-            uint8_t phys_page_num = simTlb(v_add, tlb);
-            uint8_t tlbHit = (phys_page_num >= 0);
+        }
+        else if (strcmp(h, "tlb-only") == 0) {
+            int tlb_result = simTlb(v_add, tlb);
+            uint8_t tlbHit = (tlb_result >= 0);
             doTlbStats(tlbHit, at);
-        } else if (strcmp(h, "tlb-cache") == 0) {
+        }
+        else if (strcmp(h, "tlb-cache") == 0) {
             uint32_t phys_page_num = simTlb(v_add, tlb);
             uint8_t tlbHit = (phys_page_num >= 0);
             doTlbStats(tlbHit, at);
