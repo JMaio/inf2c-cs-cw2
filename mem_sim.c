@@ -494,7 +494,7 @@ int main(int argc, char** argv) {
 
     /* Close the trace file. */
     fclose(ptr_file);
-
+    free(tlb);
     free(cache);
     return 0;
 }
