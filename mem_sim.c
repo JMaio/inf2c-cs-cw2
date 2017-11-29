@@ -261,19 +261,19 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
     // phys_page_num < 0 means miss
     tlb_block_t *block;
     // thought process: all blocks start with lru_bits set to 0
-    //     -> on a hit,
+    //      -> on a hit, set to global counter which increments on each hit, until tlb is full
+    //      -> when full, all blocks are valid
     // iterate over tlb to find matching tag
-    // (i < number_of_tlb_entries)
     for (uint8_t i = 0; (i < number_of_tlb_entries) && (phys_page_num < 0); i++) {
-
-        // block && (!hit)
         // < (tlb + number_of_tlb_entries * sizeof(tlb_block_t)); block++) {
         tlb_block_t *block = tlb + i;
-        // // else only runs while there are empty blocks (valid_bit == 0)
+        // if (block->lru_bits >= number_of_tlb_entries) printf("lru_bits > max!\n");
+        // else only runs while there are empty blocks (valid_bit == 0)
         if (block->valid_bit == 1) {
             // if valid_bit == 1 and matching tag : retrieve physical_page_num
             if (block->tag == tag) {
                 phys_page_num = block->phys_page_num;
+                updateTlbLru(i, tlb);
                 // on hit, exits loop
             }
         } else {
