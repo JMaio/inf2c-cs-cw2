@@ -410,23 +410,25 @@ int main(int argc, char** argv) {
         uint32_t at = access.accesstype;
         uint32_t v_add = access.address;
         // mask as a one-off
-        // printf("%u\n", g_page_offset_bits);
+        // printf("%u\n", g_tlb_offset_bits);
 
 
         const char* h = get_hierarchy_type(hierarchy_type);
         if (strcmp(h, "cache-only") == 0) {
             uint32_t page_o = v_add & (page_size - 1);
-            uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_page_offset_bits);
-            uint32_t phys_address = (phys_page_num << g_page_offset_bits) | page_o;
+            uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_tlb_offset_bits);
+            uint32_t phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
             uint8_t cacheHit = simCache(phys_address, cache);
             doCacheStats(cacheHit, at);
         } else if (strcmp(h, "tlb-only") == 0) {
-            uint8_t tlbHit = simTlb(v_add, tlb);
-            doTlbStats();
+            uint8_t phys_page_num = simTlb(v_add, tlb);
+            uint8_t tlbHit = (phys_page_num >= 0);
+            doTlbStats(tlbHit, at);
         } else if (strcmp(h, "tlb-cache") == 0) {
             uint32_t phys_page_num = simTlb(v_add, tlb);
-            doTlbStats();
-            uint8_t cacheHit = simCache(phys_address, cache);
+            uint8_t tlbHit = (phys_page_num >= 0);
+            doTlbStats(tlbHit, at);
+            uint8_t cacheHit = simCache(phys_page_num, cache);
         }
     }
 
