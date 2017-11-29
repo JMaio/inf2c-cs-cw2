@@ -281,33 +281,21 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
             // set block to valid
             block->valid_bit = 1;
             // only ever increments up to number_of_tlb_entries
-            block->lru_bits = ++g_tlb_lru_tracker;
+            block->lru_bits = g_tlb_lru_tracker++;
             // set tag
             block->tag = tag;
             // set physical address
             block->phys_page_num = dummy_translate_virtual_page_num(tag);
-            // printf("%i\n", phys_page_num);
-            // printf("%u\n", block->phys_page_num);
+            break;
         }
     }
-    // printf("%i\n", phys_page_num);
-    // iterate over tlb to remove 1 from every LRU, preventing growth
+    // iterate over tlb to remove 1 from each lru_bits, preventing growth
     // set 0 to max (number_of_tlb_entries) and replace with new tag
-
     if (phys_page_num < 0) {
-        if (g_tlb_lru_tracker == number_of_tlb_entries) {
-            // printf("not hit, tlb full\n");
-            for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
-                tlb_block_t *block = tlb + i;
-                // printf("%u\n", block->lru_bits);
-                block->lru_bits--;
-                if (block->lru_bits == 0) lruIndex = i;
-            }
-            tlb_block_t *block = tlb + lruIndex;
-            block->lru_bits = number_of_tlb_entries;
-            block->tag = tag;
-            block->phys_page_num = dummy_translate_virtual_page_num(tag);
-        }
+        tlb_block_t *block = tlb + lruIndex;
+        block->tag = tag;
+        block->phys_page_num = dummy_translate_virtual_page_num(tag);
+        updateTlbLru(lruIndex, tlb);
     }
     return phys_page_num;
 }
