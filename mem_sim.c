@@ -225,9 +225,10 @@ uint8_t simCache(uint32_t address, cache_block_t* cache) {
 int simTlb(uint32_t address, tlb_block_t* tlb) {
     uint32_t tag = address >> g_tlb_offset_bits;
     uint8_t hit = 0;
-    int phys_page_num;
+    uint8_t lruIndex;
+    uint32_t phys_page_num;
     // iterate over tlb to find matching tag
-    for (int i = 0; i < number_of_tlb_entries; i++) {
+    for (uint8_t i = 0; i < number_of_tlb_entries; i++) {
         if (hit) break;
 
         tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
