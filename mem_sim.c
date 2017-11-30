@@ -21,7 +21,7 @@ typedef enum {tlb_only, cache_only, tlb_cache} hierarchy_t;
 typedef enum {instruction, data} access_t;
 const char* get_hierarchy_type(uint32_t t) {
     switch(t) {
-        case tlb_only: return "tlb-only";
+        case tlb_only: return "tlb_only";
         case cache_only: return "cache-only";
         case tlb_cache: return "tlb+cache";
         default: assert(0); return "";
@@ -159,7 +159,6 @@ void init_consts() {
     g_cache_offset_bits = log(cache_block_size) / log(2);
     g_cache_index_bits = log(number_of_cache_blocks) / log(2);
     g_num_cache_tag_bits = 32 - (g_cache_index_bits + g_cache_offset_bits);
-
 }
 
 // define what a TLB line should contain
@@ -227,7 +226,7 @@ void updateTlbLru(uint8_t index, tlb_block_t* tlb) {
 // implementation note:
 //  -> LRU is implemented on a "cascading" basis: blocks start with lru_bits
 //      set to 0;
-//  ->  each block is assigned a number from 1 to n_tlb_entries on write;
+//  ->  each block is assigned a number from 0 to (n_tlb_entries - 1) on write;
 //  ->  once the tlb is full, the block with lru_bits == 0 is set to
 //      lru_bits = n_tlb_entries, and all blocks are decremented by 1, such that
 //      there will be a single block with lru_bits == 0 in the tlb
@@ -246,11 +245,7 @@ void updateTlbLru(uint8_t index, tlb_block_t* tlb) {
             block->lru_bits--;
         }
     }
-    if (g_tlb_lru_tracker == number_of_tlb_entries) {
-        block_recent->lru_bits = number_of_tlb_entries - 1;
-    } else {
-        block_recent->lru_bits = g_tlb_lru_tracker;
-    }
+    block_recent->lru_bits = g_tlb_lru_tracker - 1;
 }
 
 // return integer to make sure it's hit: -1 = miss; >= 0 = hit
@@ -258,6 +253,7 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
     uint32_t tag = address >> g_tlb_offset_bits;
     uint8_t lruIndex;
     int phys_page_num = -1;
+    uint8_t filledBlock = 0;
     // phys_page_num < 0 means miss
     tlb_block_t *block;
     // thought process: all blocks start with lru_bits set to 0
@@ -266,11 +262,12 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
     // iterate over tlb to find matching tag
     for (uint8_t i = 0; (i < number_of_tlb_entries) && (phys_page_num < 0); i++) {
         // < (tlb + number_of_tlb_entries * sizeof(tlb_block_t)); block++) {
-        tlb_block_t *block = tlb + i;
+        block = tlb + i;
         // if (block->lru_bits >= number_of_tlb_entries) printf("lru_bits > max!\n");
         // else only runs while there are empty blocks (valid_bit == 0)
         if (block->valid_bit == 1) {
             // if valid_bit == 1 and matching tag : retrieve physical_page_num
+            if (block->lru_bits == 0) lruIndex = i;
             if (block->tag == tag) {
                 phys_page_num = block->phys_page_num;
                 updateTlbLru(i, tlb);
@@ -286,42 +283,21 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
             block->tag = tag;
             // set physical address
             block->phys_page_num = dummy_translate_virtual_page_num(tag);
+
+            filledBlock = 1;
             break;
         }
     }
     // iterate over tlb to remove 1 from each lru_bits, preventing growth
     // set 0 to max (number_of_tlb_entries) and replace with new tag
-    if (phys_page_num < 0) {
-        tlb_block_t *block = tlb + lruIndex;
+    if (phys_page_num < 0 && filledBlock == 0) {
+        block = tlb + lruIndex;
         block->tag = tag;
         block->phys_page_num = dummy_translate_virtual_page_num(tag);
         updateTlbLru(lruIndex, tlb);
     }
     return phys_page_num;
 }
-
-// void testTlb(tlb_block_t* tlb) {
-//     for (int i = 0; i < number_of_tlb_entries; i++) {
-//         tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
-//         block->tag = i;
-//     }
-//     for (int i = 0; i < number_of_tlb_entries; i++) {
-//         tlb_block_t *block = tlb + i;
-//         printf("%u\n", block->tag);
-//     }
-//     for (int i = 0; i < number_of_tlb_entries; i++) {
-//         tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
-//         printf("%u\n", block->tag);
-//     }
-//     // for (int i = 0; i < number_of_tlb_entries; i++) {
-//     //     tlb_block_t *block = tlb + (i * sizeof(tlb_block_t));
-//     //     block->tag = i;
-//     // }
-//     // for (int i = 0; i < number_of_tlb_entries; i++) {
-//     //     tlb_block_t *block = tlb + i;
-//     //     block->tag = i;
-//     // }
-// }
 
 void doCacheStats(uint8_t cacheHit, access_t at) {
     if (cacheHit) {
@@ -466,12 +442,14 @@ int main(int argc, char** argv) {
     // make visible to all in main
 
     tlb_block_t* tlb = malloc(number_of_tlb_entries * sizeof(tlb_block_t));
-    
+
     cache_block_t* cache = malloc(number_of_cache_blocks * sizeof(cache_block_t));
 
     if (debug) {
         do_debug(cache);
     }
+
+    // testTlb(tlb);
 
     mem_access_t access;
     /* Loop until the whole trace file has been read. */
@@ -484,28 +462,41 @@ int main(int argc, char** argv) {
         /* Feed the address to your TLB and/or Cache simulator and collect statistics. */
         uint32_t at = access.accesstype;
         uint32_t v_add = access.address;
+        uint32_t page_o = v_add & (page_size - 1);
+
+        uint32_t phys_page_num;
+        uint32_t phys_address;
         // mask as a one-off
         // printf("%u\n", g_tlb_offset_bits);
 
-
         const char* h = get_hierarchy_type(hierarchy_type);
         if (strcmp(h, "cache-only") == 0) {
-            uint32_t page_o = v_add & (page_size - 1);
-            uint32_t phys_page_num = dummy_translate_virtual_page_num(v_add >> g_tlb_offset_bits);
-            uint32_t phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
+            // phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
+            phys_page_num = dummy_translate_virtual_page_num(v_add >> g_tlb_offset_bits);
+            phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
+
             uint8_t cacheHit = simCache(phys_address, cache);
             doCacheStats(cacheHit, at);
         }
-        else if (strcmp(h, "tlb-only") == 0) {
+        else if (strcmp(h, "tlb_only") == 0) {
             int tlb_result = simTlb(v_add, tlb);
             uint8_t tlbHit = (tlb_result >= 0);
             doTlbStats(tlbHit, at);
         }
-        else if (strcmp(h, "tlb-cache") == 0) {
-            uint32_t phys_page_num = simTlb(v_add, tlb);
-            uint8_t tlbHit = (phys_page_num >= 0);
+        else if (strcmp(h, "tlb+cache") == 0) {
+            int tlb_result = simTlb(v_add, tlb);
+            uint8_t tlbHit = (tlb_result >= 0);
             doTlbStats(tlbHit, at);
-            uint8_t cacheHit = simCache(phys_page_num, cache);
+
+            if (tlbHit) {
+                phys_address = (tlb_result << g_tlb_offset_bits) | page_o;
+            } else {
+                phys_page_num = dummy_translate_virtual_page_num(v_add >> g_tlb_offset_bits);
+                phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
+            }
+
+            uint8_t cacheHit = simCache(phys_address, cache);
+            doCacheStats(cacheHit, at);
         }
     }
 
