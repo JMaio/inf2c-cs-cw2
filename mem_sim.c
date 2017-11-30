@@ -176,6 +176,11 @@ typedef struct {
     uint32_t tag;
 } cache_block_t;
 
+typedef struct {
+    uint8_t hit;
+    uint32_t phys_page_num;
+} tlb_result_t;
+
 // get tag from address
 uint32_t maskCacheTag(uint32_t address) {
     // shift 32 - tag_bits to right to keep only tag bits
@@ -249,18 +254,19 @@ void updateTlbLru(uint8_t index, tlb_block_t* tlb) {
 }
 
 // return integer to make sure it's hit: -1 = miss; >= 0 = hit
-int simTlb(uint32_t address, tlb_block_t* tlb) {
+tlb_result_t simTlb(uint32_t address, tlb_block_t* tlb) {
     uint32_t tag = address >> g_tlb_offset_bits;
     uint8_t lruIndex;
-    int phys_page_num = -1;
     uint8_t filledBlock = 0;
-    // phys_page_num < 0 means miss
+
+    tlb_result_t tlb_result = {.hit = 0, .phys_page_num = 0};
+
     tlb_block_t *block;
     // thought process: all blocks start with lru_bits set to 0
     //      -> on a hit, set to global counter which increments on each hit, until tlb is full
     //      -> when full, all blocks are valid
     // iterate over tlb to find matching tag
-    for (uint8_t i = 0; (i < number_of_tlb_entries) && (phys_page_num < 0); i++) {
+    for (uint8_t i = 0; (i < number_of_tlb_entries) && (tlb_result.hit == 0); i++) {
         // < (tlb + number_of_tlb_entries * sizeof(tlb_block_t)); block++) {
         block = tlb + i;
         // if (block->lru_bits >= number_of_tlb_entries) printf("lru_bits > max!\n");
@@ -269,7 +275,8 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
             // if valid_bit == 1 and matching tag : retrieve physical_page_num
             if (block->lru_bits == 0) lruIndex = i;
             if (block->tag == tag) {
-                phys_page_num = block->phys_page_num;
+                tlb_result.phys_page_num = block->phys_page_num;
+                tlb_result.hit = 1;
                 updateTlbLru(i, tlb);
                 // on hit, exits loop
             }
@@ -282,7 +289,8 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
             // set tag
             block->tag = tag;
             // set physical address
-            block->phys_page_num = dummy_translate_virtual_page_num(tag);
+            tlb_result.phys_page_num = dummy_translate_virtual_page_num(tag);
+            block->phys_page_num = tlb_result.phys_page_num;
 
             filledBlock = 1;
             break;
@@ -290,13 +298,15 @@ int simTlb(uint32_t address, tlb_block_t* tlb) {
     }
     // iterate over tlb to remove 1 from each lru_bits, preventing growth
     // set 0 to max (number_of_tlb_entries) and replace with new tag
-    if (phys_page_num < 0 && filledBlock == 0) {
+    if (tlb_result.hit == 0 && filledBlock == 0) {
         block = tlb + lruIndex;
         block->tag = tag;
-        block->phys_page_num = dummy_translate_virtual_page_num(tag);
+
+        tlb_result.phys_page_num = dummy_translate_virtual_page_num(tag);
+        block->phys_page_num = tlb_result.phys_page_num;
         updateTlbLru(lruIndex, tlb);
     }
-    return phys_page_num;
+    return tlb_result;
 }
 
 void doCacheStats(uint8_t cacheHit, access_t at) {
@@ -479,21 +489,13 @@ int main(int argc, char** argv) {
             doCacheStats(cacheHit, at);
         }
         else if (strcmp(h, "tlb_only") == 0) {
-            int tlb_result = simTlb(v_add, tlb);
-            uint8_t tlbHit = (tlb_result >= 0);
-            doTlbStats(tlbHit, at);
+            tlb_result_t tlb_result = simTlb(v_add, tlb);
+            doTlbStats(tlb_result.hit, at);
         }
         else if (strcmp(h, "tlb+cache") == 0) {
-            int tlb_result = simTlb(v_add, tlb);
-            uint8_t tlbHit = (tlb_result >= 0);
-            doTlbStats(tlbHit, at);
-
-            if (tlbHit) {
-                phys_address = (tlb_result << g_tlb_offset_bits) | page_o;
-            } else {
-                phys_page_num = dummy_translate_virtual_page_num(v_add >> g_tlb_offset_bits);
-                phys_address = (phys_page_num << g_tlb_offset_bits) | page_o;
-            }
+            tlb_result_t tlb_result = simTlb(v_add, tlb);
+            doTlbStats(tlb_result.hit, at);
+            phys_address = (tlb_result.phys_page_num << g_tlb_offset_bits) | page_o;
 
             uint8_t cacheHit = simCache(phys_address, cache);
             doCacheStats(cacheHit, at);
