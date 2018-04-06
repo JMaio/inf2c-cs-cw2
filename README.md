@@ -1,1 +1,1 @@
-# 2c-cs-cw2
+# inf2c-cs-cw2
